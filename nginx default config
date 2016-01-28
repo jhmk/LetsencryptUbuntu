@@ -1,0 +1,91 @@
+server {
+  listen 80 default_server; 
+ 
+  server_name DOMAIN;
+ 
+  return 301 https://$server_name$request_uri;
+
+  root /usr/share/nginx/WEBCONTENT;
+  
+  index index.php index.html index.htm;
+ 
+  # static file 404's aren't logged and expires header is set to maximum age
+  location ~* \.(jpg|jpeg|gif|css|png|js|ico|html)$ {
+    access_log off;
+    expires max;
+  }
+ 
+  location ~ \.php$ {
+    include fastcgi_params;
+    fastcgi_intercept_errors on;
+    # By all means use a different server for the fcgi processes if you need to
+    fastcgi_pass unix:/var/run/php5-fpm.sock;  #127.0.0.1:YOURFCGIPORTHERE;
+  }
+ 
+  location ~ /\.ht {
+    deny  all;
+  }
+
+
+
+}
+
+
+##SSL
+# HTTPS server
+# remove spdy if you have HTTP2
+server {
+	listen 443 ssl spdy default;
+	listen [IPv6]:443 default_server ipv6only=on;
+	server_name DOMAIN;
+
+	root /usr/share/nginx/WEBCONTENT;
+	index index.php index.html index.htm;
+
+	ssl on;
+	ssl_certificate /PATHTO/fullchain.pem;
+	ssl_certificate_key /PATHTO/privkey.pem;
+
+
+
+	#Stapling
+	ssl_stapling on;
+  	ssl_stapling_verify on;
+	ssl_trusted_certificate /PATHTO/chain.pem;
+
+	resolver 8.8.8.8 [2001:4860:4860::8888] 8.8.4.4 valid=300s;
+  	resolver_timeout 10s;
+
+        #SPDY
+        spdy_headers_comp 0;
+
+        #Security Features Added
+        add_header X-Frame-Options DENY;
+        add_header X-Content-Type-Options nosniff;
+        add_header X-XSS-Protection "1; mode=block";
+        ssl_session_cache shared:SSL:10m;
+        ssl_session_timeout 5m;
+        #HSTS not working fine -> error in Chrome, without includeSubdomains it works
+        add_header Strict-Transport-Security "max-age=31536000; includeSubdomains;preload;";
+        #Diffie-Hellmann
+        ssl_dhparam  /PATHTO/dhparam.pem;
+	ssl_ecdh_curve secp384r1;
+
+	#Key-Pinning
+	#add_header Public-Key-Pins 'pin-sha512="HASH";  max-age=31536000; includeSubDomains';
+	#Auth-Key Pinning
+	#add_header Public-Key-Pins 'pin-sha512="HASH"; max-age=31536000; includeSubDomains';
+
+	server_tokens off;
+	ssl_protocols TLSv1.2;
+	ssl_ciphers "EECDH+ECDSA+AESGCM EECDH+aRSA+AESGCM EECDH+ECDSA+SHA384 EECDH+ECDSA+SHA256 EECDH+aRSA+SHA384 EECDH+aRSA+SHA256 EECDH+aRSA EECDH !aNULL !eNULL !LOW !3DES !MD5 !EXP !PSK !SRP !DSS !RC4 !AES128";
+	ssl_prefer_server_ciphers on;
+
+  location ~ \.php$ {
+    include fastcgi_params;
+    fastcgi_intercept_errors on;
+    # By all means use a different server for the fcgi processes if you need to
+    fastcgi_pass unix:/var/run/php5-fpm.sock;  #127.0.0.1:YOURFCGIPORTHERE;
+  }
+
+}
